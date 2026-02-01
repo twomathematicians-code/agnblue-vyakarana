@@ -1,0 +1,13 @@
+# Architecture Guardian owns Sanskrit Core
+# Changes to these files require specific approval
+
+/agnblue/runtime/       @twomathematicians-code
+/agnblue/runtime/*.py   @twomathematicians-code
+/agnblue/runtime/**     @twomathematicians-code
+
+# Project Steward owns interface layer
+/agnblue/compiler/      @twomathematicians-code
+/agnblue/cli.py         @twomathematicians-code
+*.md                    @twomathematicians-code
+pyproject.toml          @twomathematicians-code
+LICENSE                 @twomathematicians-code

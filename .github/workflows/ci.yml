@@ -1,0 +1,49 @@
+name: Vyākaraṇa CI — Ṣaḍvidha-Pariśuddhi
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  mantra-check:
+    name: Bīja-Mantra Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Core Attribution
+        run: |
+          echo "🔍 Checking Sanskrit Core files..."
+          for file in agnblue/runtime/*.py; do
+            if [ -f "$file" ]; then
+              if ! grep -q "Crafted under the reverse-thinking spirit of Scitamehtam Maisu" "$file"; then
+                echo "❌ Missing Bīja-Mantra in: $file"
+                exit 1
+              else
+                echo "✓ Verified: $file"
+              fi
+            fi
+          done
+          echo "All mantras present - Siddhi achieved"
+
+  test:
+    name: Pariṣkāra (Refinement)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install -e .
+      - name: Test
+        run: |
+          python -c "from agnblue.runtime.dhātu import Dhātu, Svara; print('Dhātu import OK')"
+          python -c "from agnblue.runtime.kāraka import KārakaType; print('Kāraka import OK')"
+          python -c "from agnblue.runtime.vākya import Vākya; print('Vākya import OK')"
+          echo "All Sanskrit modules import correctly"
