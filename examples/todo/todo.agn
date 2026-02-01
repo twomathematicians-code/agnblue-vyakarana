@@ -1,0 +1,222 @@
+blueprint TodoApp {
+    version: "0.1.0"
+    description: "Task management with Sanskrit grammar"
+    mantra: "Om Kāryasiddhaye Namah"
+}
+
+// ============================================
+// DHĀTUS (Root Capabilities)
+// ============================================
+
+root Create {
+    gana: 8              // Transitive, transformative
+    visibility: public   // Udātta - externally callable
+    artha: "create_task"
+    prayoga: kartari     // Active voice
+}
+
+root View {
+    gana: 1              // Intransitive
+    visibility: public
+    artha: "view_list"
+    prayoga: kartari
+}
+
+root Complete {
+    gana: 3              // Causative
+    visibility: protected // Svarita - internal use
+    artha: "complete_task"
+    prayoga: karmaṇi     // Passive transformation
+}
+
+root Delete {
+    gana: 8
+    visibility: private   // Anudatta - strictly internal
+    artha: "delete_task"
+}
+
+// ============================================
+// ENTITIES (Pratipadikas)
+// ============================================
+
+entity Todo {
+    // Liṅga-Vacana classification
+    gender: neutral      // Napumsaka - static resultant
+    number: singular     // Ekavacana - individual items
+    
+    // Attributes with Svara-based visibility
+    @udatta id: UUID {
+        description: "Unique identifier - publicly readable"
+    }
+    
+    @udatta title: String(100) {
+        validations: [not_empty, max_length]
+    }
+    
+    @svarita status: Status {
+        values: [pending, in_progress, completed]
+        default: pending
+    }
+    
+    @anudatta internal_notes: Text {
+        description: "Private notes - submerged visibility"
+    }
+    
+    @samvrita created_at: DateTime {
+        description: "Immutable timestamp - sealed forever"
+    }
+    
+    // ============================================
+    // ACTIONS (Vākyas - Sentences)
+    // ============================================
+    
+    action create implements Create {
+        // Kāraka Structure (Grammatical Roles)
+        perform User as kartri {
+            description: "Agent who initiates creation"
+        }
+        
+        receive Todo as karman {
+            description: "Object being created"
+            preconditions: [
+                "title must not be śūnya (empty)"
+            ]
+        }
+        
+        send Repository as sampradana {
+            description: "Recipient of the action result"
+        }
+        
+        // Execution steps
+        steps: [
+            "validate karman.title",
+            "generate kartṛ timestamp",
+            "persist to sampradāna",
+            "return siddhi (success)"
+        ]
+    }
+    
+    action view implements View {
+        perform User as kartri
+        receive TodoList as karman {
+            quantity: multiple  // Bahuvacana
+            filter: {status: not_deleted}
+        }
+        
+        use Database as karaṇa {
+            description: "Instrument of viewing"
+        }
+        
+        steps: [
+            "query karaṇa for karman",
+            "filter by kartṛ permissions",
+            "return collection"
+        ]
+    }
+    
+    action complete implements Complete {
+        perform User as kartri
+        transform Todo as karman {
+            from: Status.pending
+            to: Status.completed
+        }
+        
+        from Status.Incomplete as apādāna {
+            description: "Source state (Ablative)"
+        }
+        
+        to Status.Complete as adhikaraṇa {
+            description: "Target state (Locative)"
+        }
+        
+        steps: [
+            "verify kartṛ ownership of karman",
+            "transition apādāna → adhikaraṇa",
+            "persist transformation",
+            "emit siddhi event"
+        ]
+    }
+}
+
+// ============================================
+// VALUE OBJECTS (Immutable Dhātus)
+// ============================================
+
+value_object TodoTitle {
+    gender: feminine     // Strīliṅga - container/validation
+    number: singular
+    
+    attributes {
+        value: String(100)
+        slug: String(100)
+    }
+    
+    invariants: [
+        "value cannot be śūnya (empty)",
+        "slug must be url-safe"
+    ]
+    
+    equality: [value, slug]
+}
+
+// ============================================
+// SERVICES (Agentive - Puṃliṅga)
+// ============================================
+
+service TodoService {
+    gender: masculine    // Puṃliṅga - active, agentive
+    number: plural       // Bahuvacana - handles many
+    
+    dependencies {
+        @karman TodoRepository      // Object of persistence
+        @karaṇa Logger              // Instrument of logging
+        @sampradāna EventBus        // Recipient of events
+    }
+    
+    action processBatch implements Create {
+        perform Scheduler as kartri
+        receive TodoArray as karman
+        use ThreadPool as karaṇa
+        
+        steps: [
+            "distribute karman across karaṇa",
+            "aggregate results",
+            "notify sampradāna"
+        ]
+    }
+}
+
+// ============================================
+// ADAPTERS (Sandhi - Interface Boundaries)
+// ============================================
+
+adapter HTTP implements Create, View {
+    sandhi_type: svara_sandhi    // Vowel-smooth (REST)
+    
+    junction {
+        route POST "/todos" → Todo.create {
+            content_type: application/json
+            auth_required: true
+        }
+        
+        route GET "/todos" → Todo.view {
+            pagination: {limit: 20, offset: 0}
+            filter_params: [status, date_range]
+        }
+    }
+}
+
+adapter SQL implements Repository {
+    sandhi_type: vyanjana_sandhi  // Consonant-hard (Database)
+    
+    junction {
+        table: "todos"
+        column id → Todo.id
+        column title → Todo.title
+        column status → Todo.status
+        
+        // Sandhi transformation rules
+        naming_convention: snake_case
+        encoding: utf8mb4  // Supports Sanskrit diacritics
+    }
+}
