@@ -1,18 +1,38 @@
-# AgnBlue Vyākaraṇa
+<p align="center">
+  <h1 align="center">AgnBlue Vyākaraṇa</h1>
+  <p align="center"><strong>व्याकरणम् इव कोडः</strong> — Code as Grammar</p>
+  <p align="center">
+    <a href="https://github.com/twomathematicians-code/agnblue-vyakarana/actions"><img src="https://github.com/twomathematicians-code/agnblue-vyakarana/workflows/Vyākaraṇa%20CI%20—%20Ṣaḍvidha-Pariśuddhi/badge.svg" alt="CI Status"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg" alt="Python"></a>
+  </p>
+</p>
 
-&gt; **The Programming Language Based on Sanskrit Grammatical Structure**
+---
 
-AgnBlue applies Pāṇinian grammar to software architecture.
+## 🕉️ What is This?
 
-## Core Concepts
+AgnBlue Vyākaraṇa is the first programming language based on **Pāṇinian Sanskrit grammar** (Aṣṭādhyāyī, ~500 BCE). 
 
-- **Dhātu** (धातु): Root capabilities
-- **Kāraka** (कारक): Grammatical role injection
-- **Vākya** (वाक्य): Sentence-based execution
-- **Svara**: Pitch-accent visibility
+Instead of classes and functions, you write **Dhātus** (roots), **Kārakas** (grammatical roles), and **Vākyas** (sentences). The compiler translates your English-syntax blueprint into Sanskrit structural logic.
 
-## License
+```agnblue
+// Example: A Todo in AgnBlue
+blueprint TodoApp { version: "0.1.0" }
 
-MIT License — Copyright (c) 2024 Scitamehtam Maisu
+root Create { 
+    gana: 8           // Transitivity class
+    visibility: public // Udātta - high pitch
+}
 
-*Crafted under the reverse-thinking spirit of Scitamehtam Maisu*
+entity Todo {
+    @public title: String       // Externally visible
+    @private id: UUID           // Submerged (Anudatta)
+    @immutable created: DateTime // Sealed forever (Samvrita)
+    
+    action create implements Create {
+        perform User as kartri      // Agent (Nominative)
+        receive Todo as karman      // Object (Accusative)
+        send Database as sampradana // Recipient (Dative)
+    }
+}
