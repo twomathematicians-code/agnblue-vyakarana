@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agnblue-vyakarana"
+version = "0.1.0"
+description = "Programming language based on Sanskrit grammatical structure"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Scitamehtam Maisu"}]
+requires-python = ">=3.10"
+
+[project.scripts]
+agnblue = "agnblue.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0"]
+
+[tool.black]
+line-length = 88
