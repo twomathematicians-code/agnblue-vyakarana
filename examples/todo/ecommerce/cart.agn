@@ -1,0 +1,572 @@
+blueprint ECommerceSystem {
+    version: "0.2.0"
+    description: "Shopping cart with Sanskrit transactional grammar"
+    mantra: "Om Vāṇijayebhyo Namah"  // Salutations to commerce
+}
+
+// ============================================
+// DHĀTUS (Transactional Roots)
+// ============================================
+
+root AddItem {
+    gana: 8              // Transitive - adds to collection
+    visibility: public
+    artha: "add_to_cart"
+    prayoga: kartari     // Active: Customer performs addition
+}
+
+root RemoveItem {
+    gana: 8
+    visibility: public
+    artha: "remove_from_cart"
+    prayoga: kartari
+}
+
+root Checkout {
+    gana: 1              // Complex operation
+    visibility: public
+    artha: "initiate_purchase"
+    prayoga: kartari
+}
+
+root ProcessPayment {
+    gana: 4              // Causative - causes money transfer
+    visibility: private
+    artha: "transfer_funds"
+    prayoga: karmaṇi     // Passive: Money is transferred
+}
+
+root ReserveInventory {
+    gana: 9              // Stative - changes state
+    visibility: protected
+    artha: "reserve_stock"
+    prayoga: karmaṇi     // Passive: Stock is reserved
+}
+
+root FulfillOrder {
+    gana: 1
+    visibility: public
+    artha: "complete_delivery"
+    prayoga: kartari
+}
+
+root ReduceStock {
+    gana: 9
+    visibility: private  // Internal - inventory management
+    artha: "decrement_inventory"
+    prayoga: bhāve       // Impersonal - stock diminishes without agent
+}
+
+// ============================================
+// ENTITIES
+// ============================================
+
+entity Customer {
+    gender: masculine     // Puṃliṅga - active buyer
+    number: singular      // Ekavacana - individual
+    
+    @udatta customer_id: UUID
+    @udatta email: String(255) {
+        validations: [email_format]
+    }
+    @svarita shipping_address: Address
+    @samvrita created_at: DateTime
+    @anudatta payment_methods: Array<PaymentMethod>
+    
+    action purchase implements Checkout {
+        perform Customer as kartri
+        
+        // Dual relationship - Transaction (Dvivacana concept)
+        with Cart as saha {  // Saha = comitative (association)
+            description: "Buyer associated with cart"
+        }
+        
+        pay_to Merchant as sampradāna {
+            description: "Recipient of payment (Dative case)"
+            amount: Money
+            currency: Currency
+        }
+        
+        use PaymentGateway as karaṇa {
+            type: secure_processor
+        }
+        
+        receive OrderConfirmation as karman
+        
+        steps: [
+            "validate kartri.account_status",
+            "verify saha.items availability",
+            "process payment via karaṇa to sampradāna",
+            "generate karman",
+            "notify all parties"
+        ]
+    }
+}
+
+entity Merchant {
+    gender: masculine
+    number: singular
+    
+    @udatta merchant_id: UUID
+    @udatta business_name: String(100)
+    @svarita bank_account: BankDetails
+    @anudatta commission_rate: Percentage
+    
+    // Seller receives payment (Sampradāna)
+    action receivePayment implements ProcessPayment {
+        from Customer as apādāna {
+            description: "Source of funds (Ablative)"
+        }
+        
+        to MerchantAccount as adhikaraṇa {
+            description: "Destination of funds (Locative)"
+        }
+        
+        amount Money as karman
+    }
+}
+
+entity Cart {
+    // Transactional Unit - Dual nature (Dvivacana)
+    gender: neutral       // Napumsaka - container/result
+    number: dual          // Dvivacana - connects Buyer ↔ Seller
+    
+    @udatta cart_id: UUID
+    @udatta customer_id: UUID  // Reference to owner
+    @svarita items: Array<CartItem>
+    @samvrita created_at: DateTime
+    @samvrita expires_at: DateTime  // Immutable expiration
+    
+    invariants: [
+        "Cart must contain at least 1 item for checkout (Śūnya-vārjanam)",
+        "Total value must be non-negative (Ṛṇa-niṣedhaḥ)",
+        "Expiration must be within 7 days (Saptāha-maryādā)"
+    ]
+    
+    business_rules: [
+        "sutra_1: Maximum 10 items per cart (Daśa-maryādā)",
+        "sutra_2: Reserved items expire after 15 minutes (Pāṇḍu-kālaḥ)",
+        "sutra_3: Abandoned carts convert to wishlist (Tyakta-pātra-saṅkramaṇam)"
+    ]
+    
+    action add implements AddItem {
+        perform Customer as kartri
+        receive Product as karman {
+            prerequisites: [
+                "karman.inventory > 0",
+                "karman.status = available"
+            ]
+        }
+        
+        into Cart as adhikaraṇa {
+            description: "Container receiving item (Locative)"
+        }
+        
+        use InventoryService as karaṇa
+        
+        steps: [
+            "validate kartri.session",
+            "lock karman via karaṇa (karmaṇi prayoga)",
+            "reduce available stock by 1",
+            "attach karman to adhikaraṇa",
+            "recalculate totals"
+        ]
+    }
+    
+    action remove implements RemoveItem {
+        perform Customer as kartri
+        release CartItem as karman  // Apādāna - releasing from
+        
+        from Cart as apādāna
+        
+        restore Inventory as sampradāna {
+            description: "Stock returns to inventory"
+        }
+    }
+    
+    action checkout implements Checkout {
+        perform Customer as kartri
+        
+        // Complex multi-Kāraka transaction
+        transform Cart as karman {
+            from: Cart
+            to: Order
+        }
+        
+        deduct_from PaymentMethod as apādāna
+        
+        deliver_to ShippingAddress as sampradāna
+        
+        via PaymentProcessor as karaṇa
+        
+        in_context Session as adhikaraṇa
+        
+        steps: [
+            "validate karman.total > 0",
+            "verify apādāna.balance >= karman.total",
+            "reserve all items (karmaṇi prayoga)",
+            "process payment (sampradāna settlement)",
+            "create Order karman",
+            "clear adhikaraṇa (cart expires)",
+            "trigger fulfillment workflow"
+        ]
+        
+        postconditions: [
+            "Cart status = converted",
+            "Order status = confirmed",
+            "Inventory reserved (not yet reduced - awaiting fulfillment)"
+        ]
+    }
+}
+
+entity Product {
+    gender: feminine      // Strīliṅga - producible, manufacturable
+    number: singular
+    
+    @udatta product_id: UUID
+    @udatta sku: String(50)
+    @udatta name: String(200)
+    @udatta base_price: Money
+    
+    @svarita inventory_count: Integer {
+        constraints: [min: 0]
+        visibility: protected  // Only via InventoryService
+    }
+    
+    @samvrita created_at: DateTime
+    @samvrita discontinued_at: Optional<DateTime>
+    
+    invariants: [
+        "price must be positive (Dhanātmake bhavet)",
+        "inventory cannot be negative (Ṛṇaṃ na bhavet)"
+    ]
+    
+    // Stock management - Bhāve prayoga (Impersonal)
+    action decrementStock implements ReduceStock {
+        // No kartri - stock reduces impersonally
+        quantity Integer as karman
+        
+        from Inventory as apādāna {
+            description: "Source quantity decreases"
+        }
+        
+        steps: [
+            "verify apādāna.quantity >= karman",
+            "apādāna.quantity -= karman",
+            "if apādāna.quantity == 0: status = out_of_stock"
+        ]
+    }
+}
+
+entity CartItem {
+    gender: neutral
+    number: singular      // Part of dual Cart structure
+    
+    @udatta item_id: UUID
+    @udatta product_id: UUID
+    @udatta quantity: Integer(1..99)
+    @udatta unit_price: Money  // Snapshot at addition time
+    @svarita selected_options: Map<String, String>  // Color, size, etc.
+    @samvrita added_at: DateTime
+    
+    // Calculated
+    derived total_price: Money = unit_price * quantity
+}
+
+entity Order {
+    gender: masculine     // Result of active transaction
+    number: singular      // Final resultant state
+    
+    @udatta order_id: UUID
+    @udatta order_number: String(20)  # Human readable
+    @udatta customer_id: UUID
+    @udatta merchant_id: UUID
+    @udatta items: Array<OrderItem>
+    @udatta total_amount: Money
+    @udatta status: OrderStatus  // pending, paid, shipped, delivered
+    
+    @samvrita placed_at: DateTime
+    @samvrita paid_at: Optional<DateTime>
+    @anudatta payment_token: String  // Encrypted reference
+    
+    // Order fulfills the transaction (Pariṇāma)
+    action fulfill implements FulfillOrder {
+        perform FulfillmentService as kartri
+        execute Order as karman
+        
+        reduce Inventory as karma {  // Passive consumption
+            description: "Stock is permanently reduced (Karmaṇi)"
+        }
+        
+        deliver_to Customer as sampradāna {
+            method: shipping_carrier
+            tracking: TrackingNumber
+        }
+        
+        steps: [
+            "pick items from warehouse",
+            "pack with care",
+            "hand to carrier",
+            "update karman.status = shipped",
+            "notify sampradāna of tracking"
+        ]
+    }
+}
+
+// ============================================
+// VALUE OBJECTS
+// ============================================
+
+value_object Money {
+    gender: neutral
+    number: singular
+    
+    attributes {
+        amount: Decimal(10, 2)
+        currency: ISO4217_Code
+    }
+    
+    invariants: [
+        "amount precision = 2 decimal places",
+        "currency must be valid code"
+    ]
+    
+    // Operations return new instances (immutable)
+    operation add(other: Money): Money
+    operation subtract(other: Money): Money
+    operation multiply(factor: Decimal): Money
+    
+    equality: [amount, currency]
+}
+
+value_object Address {
+    gender: feminine  // Strīliṅga - locative/receptive
+    number: singular
+    
+    attributes {
+        line1: String(100)
+        line2: Optional<String(100)>
+        city: String(50)
+        postal_code: String(20)
+        country: ISO3166_Code
+    }
+    
+    validation: "Required for shipping (Sampradāna-Adhikaraṇa)"
+}
+
+// ============================================
+// SERVICES
+// ============================================
+
+service InventoryService {
+    gender: masculine
+    number: singular      // Singleton coordinator
+    
+    dependencies {
+        @karaṇa Database
+        @karaṇa Cache
+        @sampradāna NotificationService
+    }
+    
+    action reserve implements ReserveInventory {
+        // Karmaṇi prayoga - passive construction
+        // "Stock IS RESERVED" (not "Agent reserves stock")
+        
+        target Product as karman
+        quantity Integer as measure
+        
+        for Cart as prayojana {  // Purpose case
+            description: "Reservation purpose"
+        }
+        
+        duration Minutes(15) as kāla  // Time limitation
+        
+        steps: [
+            "verify karman.available >= measure",
+            "create reservation record",
+            "decrement available count",
+            "set kāla expiration timer",
+            "if kāla expires: auto-release (karmaṇi undo)"
+        ]
+    }
+}
+
+service PaymentOrchestrator {
+    gender: masculine
+    number: singular
+    
+    dependencies {
+        @karaṇa PaymentGateway
+        @karaṇa FraudDetector
+        @karaṇa AuditLogger
+    }
+    
+    action process implements ProcessPayment {
+        perform Customer as kartri
+        transfer Money as karman {
+            from: CustomerAccount (apādāna)
+            to: MerchantAccount (sampradāna)
+        }
+        
+        using PaymentMethod as karaṇa
+        
+        in_context Transaction as adhikaraṇa
+        
+        with_guarantee FraudCheck as nipāta {  // Particle/modifier
+            level: mandatory
+            timeout: 30_seconds
+        }
+        
+        steps: [
+            "validate kartri.session",
+            "verify karaṇa.active",
+            "check nipāta (fraud score)",
+            "lock karman.amount",
+            "initiate transfer",
+            "wait for karaṇa.callback",
+            "on success: commit adhikaraṇa",
+            "on failure: rollback all"
+        ]
+    }
+}
+
+// ============================================
+// ADAPTERS (Sandhi - Platform Boundaries)
+// ============================================
+
+adapter StripeGateway implements ProcessPayment {
+    sandhi_type: svara_sandhi  // Smooth API integration
+    
+    junction {
+        endpoint: "https://api.stripe.com/v1"
+        authentication: bearer_token
+        content_type: application/json
+        
+        // Euphonic transformations
+        map PaymentIntent.to_json() → stripe_request
+        map stripe_response → PaymentConfirmation
+        
+        // Error handling (Viṣṇu-lopa - visarga dropping)
+        on_error: "Transform to domain exception"
+        timeout: 30s
+        retries: 3
+    }
+}
+
+adapter PayPalGateway implements ProcessPayment {
+    sandhi_type: vyanjana_sandhi  // Different consonant structure
+    
+    junction {
+        endpoint: "https://api.paypal.com/v2"
+        authentication: oauth2
+        content_type: application/json
+        
+        sandhi_rules: [
+            "amount_cents → paypal_value (100x)",
+            "currency_code → paypal_currency (uppercase)"
+        ]
+    }
+}
+
+adapter PostgreSQL implements Repository {
+    sandhi_type: vyanjana_sandhi  // Hard persistence boundary
+    
+    junction {
+        schema: "ecommerce"
+        tables: {
+            customers: Customer
+            carts: Cart
+            cart_items: CartItem
+            products: Product
+            orders: Order
+            order_items: OrderItem
+        }
+        
+        // Consonant assimilation rules
+        naming: snake_case
+        encoding: utf8mb4_unicode_ci
+        
+        // Indexes for Kāraka lookups
+        indices: [
+            "carts.customer_id (Kartṛ lookup)",
+            "orders.customer_id (Kartṛ lookup)",
+            "orders.merchant_id (Sampradāna lookup)",
+            "cart_items.product_id (Karman lookup)"
+        ]
+    }
+}
+
+adapter RedisCache implements Cache {
+    sandhi_type: visarga_sandhi  // Final release/expiration
+    
+    junction {
+        ttl: 3600  // 1 hour expiration (automatic visarga release)
+        
+        key_patterns: [
+            "cart:{cart_id} → Cart serialization",
+            "inventory:{product_id} → Stock count",
+            "session:{session_id} → Customer context"
+        ]
+    }
+}
+
+adapter REST_API implements AddItem, RemoveItem, Checkout, FulfillOrder {
+    sandhi_type: svara_sandhi  // Vowel-smooth REST endpoints
+    
+    junction {
+        routes: {
+            "POST /carts/{id}/items" → Cart.add
+            "DELETE /carts/{id}/items/{item_id}" → Cart.remove
+            "POST /carts/{id}/checkout" → Cart.checkout
+            "GET /orders/{id}" → Order.view
+            "PATCH /orders/{id}/fulfill" → Order.fulfill
+        }
+        
+        content_negotiation: [json, xml]
+        authentication: jwt_token
+        rate_limit: 100_requests/minute
+        
+        // Request/response transformations
+        input_map: "JSON body → Kāraka bindings"
+        output_map: "Vākya result → JSON response"
+    }
+}
+
+// ============================================
+// SYSTEM INVARIANTS (Sūtras)
+// ============================================
+
+system_invariants {
+    // Business rule as Pāṇinian Sūtra
+    sutra_1: "यावद् वस्तूनि सन्ति तावद् विक्रयः" 
+    // Yāvad vastūni santi tāvad vikrayaḥ
+    // "Only existing items can be sold"
+    
+    sutra_2: "अवशिष्टं धनं न ऋणम्"
+    // Avaśiṣṭaṃ dhanaṃ na ṛṇam
+    // "Remaining balance cannot be negative"
+    
+    sutra_3: "सप्ताहाद्धिकं न सङ्ग्रहेयम्"
+    // Saptāhāddhikaṃ na saṅgṛheyam
+    // "Don't hold (reservations) beyond 7 days"
+}
+
+// ============================================
+// CONFIGURATION
+// ============================================
+
+configuration {
+    currency_default: USD
+    tax_calculation: automatic
+    shipping_calculator: fedex_api
+    
+    // Liṅga-Vacana for system behavior
+    system_gender: masculine  // Active processing
+    system_number: plural     // Scalable architecture
+    
+    // Logging level as Svara
+    log_level: udatta  // High visibility (INFO+)
+    
+    // Critical operations as Samvrita
+    audit_mode: samvrita  // Immutable audit trail
+}
